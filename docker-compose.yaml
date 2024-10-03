@@ -1,0 +1,55 @@
+services:
+  claim-service:
+    build: .
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - claim-service-network
+    ports:
+      - 8000:8000
+    volumes:
+      - ./:/claim-service
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - claim-service-network
+
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - claim-service-network
+
+volumes:
+  pgdata:
+
+networks:
+  claim-service-network:
+    driver: bridge
